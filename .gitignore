@@ -1,2 +1,26 @@
+# Environment
 .env
-.venv
+.venv/
+
+# Docker data volumes (persistent data - don't commit)
+docker/postgres/data/
+docker/minio/data/
+docker/logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# dbt
+banking_dbt/target/
+banking_dbt/dbt_packages/
+banking_dbt/logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
