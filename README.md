@@ -61,3 +61,24 @@ docker compose ps
 ├── data-generator/         # Test data generation
 └── banking_dbt/            # dbt models
 ```
+
+## 🗄️ Connect PostgreSQL to DBeaver
+
+To connect the **Banking database** to DBeaver:
+
+1. Open DBeaver → **Database** → **New Database Connection**
+2. Select **PostgreSQL** and click **Next**
+3. Enter the following connection details:
+
+| Setting | Value |
+|---------|-------|
+| Host | `localhost` |
+| Port | `5432` |
+| Database | `banking` |
+| Username | `postgres` |
+| Password | `postgres` |
+
+4. Click **Test Connection** to verify
+5. Click **Finish**
+
+> **Note:** Make sure Docker services are running (`docker compose up -d`) before connecting.
