@@ -22,6 +22,10 @@ NUM_TRANSACTIONS = 200
 MAX_TXN_AMOUNT = 10000.00
 CURRENCIES = ["USD", "EUR", "GBP", "INR", "CAD", "AUD"]
 
+# Date range for realistic timestamps (2020-2024)
+DATE_START = datetime(2020, 1, 1)
+DATE_END = datetime(2024, 12, 31)
+
 # Realistic balance ranges by account type
 BALANCE_RANGES = {
     "SAVINGS": (Decimal("500.00"), Decimal("50000.00")),
@@ -134,13 +138,29 @@ def weighted_choice(choices_dict: dict) -> str:
     weights = list(choices_dict.values())
     return random.choices(choices, weights=weights, k=1)[0]
 
-def generate_realistic_timestamp(days_back: int = 365) -> datetime:
-    """Generate a realistic timestamp within the past X days"""
-    now = datetime.now()
-    random_days = random.randint(0, days_back)
-    random_hours = random.randint(6, 22)  # Most transactions during business hours
-    random_minutes = random.randint(0, 59)
-    return now - timedelta(days=random_days, hours=random_hours, minutes=random_minutes)
+def generate_random_timestamp(start_date: datetime = None, end_date: datetime = None) -> datetime:
+    """Generate a random timestamp between 2020-2024 (or custom range)"""
+    start = start_date or DATE_START
+    end = end_date or DATE_END
+    
+    # Calculate total seconds between dates
+    time_delta = end - start
+    random_seconds = random.randint(0, int(time_delta.total_seconds()))
+    
+    # Generate random time during business hours (6 AM - 10 PM) for realism
+    random_date = start + timedelta(seconds=random_seconds)
+    
+    # Adjust to realistic hours (weighted towards business hours)
+    if random.random() < 0.7:  # 70% during business hours
+        hour = random.randint(9, 18)
+    else:
+        hour = random.randint(6, 22)
+    
+    return random_date.replace(
+        hour=hour,
+        minute=random.randint(0, 59),
+        second=random.randint(0, 59)
+    )
 
 # -----------------------------
 # Connect to Postgres
@@ -178,13 +198,13 @@ def run_iteration():
         age = random.randint(18, 80)
         dob = datetime.now() - timedelta(days=age * 365 + random.randint(0, 365))
         
-        # Customer created date (within last 5 years)
-        created_at = generate_realistic_timestamp(days_back=1825)
+        # Customer created date (random between 2020-2024)
+        created_at = generate_random_timestamp()
         
         cur.execute(
-            """INSERT INTO customers (first_name, last_name, email) 
-               VALUES (%s, %s, %s) RETURNING id""",
-            (first_name, last_name, email),
+            """INSERT INTO customers (first_name, last_name, email, created_at) 
+               VALUES (%s, %s, %s, %s) RETURNING id""",
+            (first_name, last_name, email, created_at),
         )
         customer_id = cur.fetchone()[0]
         customers.append({
@@ -227,10 +247,16 @@ def run_iteration():
                 k=1
             )[0]
             
+            # Account created after customer (random date after customer creation)
+            account_created_at = generate_random_timestamp(
+                start_date=customer["created_at"],
+                end_date=DATE_END
+            )
+            
             cur.execute(
-                """INSERT INTO accounts (customer_id, account_type, balance, currency) 
-                   VALUES (%s, %s, %s, %s) RETURNING id""",
-                (customer_id, account_type, initial_balance, currency),
+                """INSERT INTO accounts (customer_id, account_type, balance, currency, created_at) 
+                   VALUES (%s, %s, %s, %s, %s) RETURNING id""",
+                (customer_id, account_type, initial_balance, currency, account_created_at),
             )
             account_id = cur.fetchone()[0]
             accounts.append({
@@ -238,6 +264,7 @@ def run_iteration():
                 "customer_id": customer_id,
                 "type": account_type,
                 "balance": float(initial_balance),
+                "created_at": account_created_at,
             })
 
     # 3. Generate realistic transactions
@@ -279,10 +306,16 @@ def run_iteration():
         # Weighted status selection
         status = weighted_choice(TXN_STATUSES)
         
+        # Transaction date (after account creation)
+        txn_timestamp = generate_random_timestamp(
+            start_date=account["created_at"],
+            end_date=DATE_END
+        )
+        
         cur.execute(
-            """INSERT INTO transactions (account_id, txn_type, amount, related_account_id, status) 
-               VALUES (%s, %s, %s, %s, %s)""",
-            (account_id, txn_type, amount, related_account, status),
+            """INSERT INTO transactions (account_id, txn_type, amount, related_account_id, status, created_at) 
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (account_id, txn_type, amount, related_account, status, txn_timestamp),
         )
 
     print(f"✅ Generated {len(customers)} customers, {len(accounts)} accounts, {NUM_TRANSACTIONS} transactions.")
