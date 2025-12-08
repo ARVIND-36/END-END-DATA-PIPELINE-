@@ -1,5 +1,4 @@
 # Environment
-.env
 .venv/
 
 # Docker data volumes (persistent data - don't commit)
